@@ -1,0 +1,169 @@
+import sqlite3
+
+conn = sqlite3.connect("bookstore.db")
+cursor = conn.cursor()
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS authors (
+        author_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        country TEXT,
+        birth_year INTEGER,
+        genre_focus TEXT,
+        bio_short TEXT
+    );
+""")
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS books (
+        book_id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        author_id INTEGER,
+        year_published INTEGER,
+        price REAL,
+        stock_qty INTEGER,
+        FOREIGN KEY (author_id) REFERENCES authors(author_id)
+    );
+""")
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
+        order_id INTEGER PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        book_id INTEGER,
+        quantity INTEGER,
+        order_date TEXT,
+        status TEXT,
+        FOREIGN KEY (book_id) REFERENCES books(book_id)
+    );
+""")
+
+# CREATE TABLE authors (
+#     author_id INT PRIMARY KEY,
+#     name VARCHAR(100),
+#     country VARCHAR(50),
+#     birth_year INT,
+#     genre_focus VARCHAR(50),
+#     bio_short TEXT
+# );
+
+authors_data = [
+    (1, 'Leo Tolstoy', 'Russia', 1828, 'Classic', 'Russian novelist known for War and Peace.'),
+    (2, 'Jane Austen', 'UK', 1775, 'Romance', 'English writer, master of social commentary.'),
+    (3, 'Haruki Murakami', 'Japan', 1949, 'Contemporary', 'Japanese author blending surrealism and realism.'),
+    (4, 'George Orwell', 'UK', 1903, 'Dystopia', 'Author of 1984 and Animal Farm.'),
+    (5, 'J.K. Rowling', 'UK', 1965, 'Fantasy', 'Creator of the Harry Potter series.'),
+    (6, 'Gabriel García Márquez', 'Colombia', 1927, 'Magical Realism', 'Nobel laureate and author of One Hundred Years of Solitude.')
+]
+
+books_data = [
+    (101, 'War and Peace', 1, 1869, 25.99, 12),
+    (102, 'Pride and Prejudice', 2, 1813, 14.50, 8),
+    (103, 'Norwegian Wood', 3, 1987, 16.75, 5),
+    (104, '1984', 4, 1949, 12.00, 20),
+    (105, "Harry Potter and the Philosopher's Stone", 5, 1997, 18.99, 15),
+    (106, 'One Hundred Years of Solitude', 6, 1967, 22.50, 7)
+]
+
+orders_data = [
+    (1001, 'Alice Johnson', 101, 1, '2024-05-01', 'Shipped'),
+    (1002, 'Bob Smith', 102, 2, '2024-05-02', 'Pending'),
+    (1003, 'Carol Davis', 104, 1, '2024-05-03', 'Delivered'),
+    (1004, 'David Lee', 105, 3, '2024-05-04', 'Processing'),
+    (1005, 'Eva Martinez', 106, 1, '2024-05-05', 'Shipped'),
+    (1006, 'Frank Wilson', 103, 2, '2024-05-06', 'Pending')
+]
+
+cursor.executemany("INSERT OR IGNORE INTO authors VALUES (?, ?, ?, ?, ?, ?)", authors_data)
+cursor.executemany("INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?, ?)", books_data)
+cursor.executemany("INSERT OR IGNORE INTO orders VALUES (?, ?, ?, ?, ?, ?)", orders_data)
+
+conn.commit()
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_orders_cost AS
+SELECT 
+    o.order_id,
+    o.customer_name,
+    b.title,
+    (o.quantity * b.price) AS total_price,
+    a.name AS author_name
+FROM orders o
+JOIN books b ON o.book_id = b.book_id
+JOIN authors a ON b.author_id = a.author_id;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_total_orders AS
+SELECT COUNT(*) AS total_count
+FROM orders;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_shipped_customers AS
+SELECT customer_name, status
+FROM orders
+WHERE status = 'Shipped'
+ORDER BY customer_name DESC
+LIMIT 2 OFFSET 1;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_years_range AS
+SELECT MIN(year_published) AS min_year, MAX(year_published) AS max_year
+FROM books;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_avg_modern_price AS
+SELECT AVG(price) AS avg_price
+FROM books
+WHERE year_published > 1900;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_min_price AS
+SELECT MIN(price) AS minimum_price
+FROM books;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_avg_stock_1984 AS
+SELECT AVG(stock_qty) AS avg_stock
+FROM books
+WHERE title = "1984";
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_sum_price_in_stock AS
+SELECT SUM(price) AS sum_price
+FROM books
+WHERE stock_qty > 10;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_genres_count AS
+SELECT a.genre_focus, COUNT(*) AS quantity
+FROM books b
+JOIN authors a ON b.author_id = a.author_id
+GROUP BY a.genre_focus;
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS table_earliest_orders AS
+SELECT status, MIN(order_date) AS min_date
+FROM orders
+GROUP BY status;
+''')
+
+conn.commit()
+
+cursor.execute("SELECT * FROM table_earliest_orders;")
+results = cursor.fetchall()
+
+print("Содержимое таблицы table_earliest_orders:")
+for row in results:
+    print(row)
+
+cursor.close()
+conn.close()
